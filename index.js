@@ -1,38 +1,11 @@
 const https = require('https');
 const fs = require('fs');
-const exec = require('child_process').exec;
-// 安装bash和unzip
-exec('sudo apt-get update && sudo apt-get install -y bash unzip', (err, stdout, stderr) => {
-  if (err) {
-    console.error(`执行命令时出错: ${err}`);
-    return;
-  }
-  console.log(`stdout: ${stdout}`);
-  console.error(`stderr: ${stderr}`);
+const { exec } = require('child_process');
 
-// 下载v2ray二进制文件
 const v2rayUrl = 'https://github.com/v2fly/v2ray-core/releases/latest/download/v2ray-linux-64.zip';
 const v2rayFile = './v2ray-linux-64.zip';
-const v2rayStream = fs.createWriteStream(v2rayFile);
-
-https.get(v2rayUrl, (res) => {
-  res.pipe(v2rayStream);
-
-  res.on('end', () => {
-    console.log('v2ray binary downloaded');
-
-    // 解压v2ray二进制文件
-    exec(`unzip ${v2rayFile} -d ./v2ray`, (err, stdout, stderr) => {
-      if (err) {
-        console.error(`v2ray binary extraction failed: ${err}`);
-        return;
-      }
-
-      console.log('v2ray binary extracted');
-
-      // 写入配置文件
-      const config = {
-    "inbounds": [
+const v2rayConfig = {
+  "inbounds": [
       {
         "protocol": "vmess",
         "listen": "0.0.0.0",
@@ -53,32 +26,71 @@ https.get(v2rayUrl, (res) => {
         }
       }
     ],
-    "outbounds": [
-      {
-        "protocol": "freedom",
-        "settings": {}
-      }
-    ]
-  };
+  "outbounds": [{
+    "protocol": "freedom",
+    "settings": {}
+  }]
+};
 
-      fs.writeFile('./v2ray/config.json', JSON.stringify(config), (err) => {
-        if (err) {
-          console.error(`v2ray config file creation failed: ${err}`);
-          return;
-        }
+exec('sudo apt-get update && sudo apt-get install -y bash unzip', (err, stdout, stderr) => {
+  if (err) {
+    console.error(`安装bash和unzip时出错: ${err}`);
+    return;
+  }
+  console.log(`stdout: ${stdout}`);
+  console.error(`stderr: ${stderr}`);
 
-        console.log('v2ray config file created');
+  downloadV2ray();
+});
 
-        // 启动v2ray代理
-        exec('./v2ray/v2ray', (err, stdout, stderr) => {
-          if (err) {
-            console.error(`v2ray proxy start failed: ${err}`);
-            return;
-          }
+function downloadV2ray() {
+  const v2rayStream = fs.createWriteStream(v2rayFile);
 
-          console.log('v2ray proxy started');
-        });
-      });
+  https.get(v2rayUrl, (res) => {
+    res.pipe(v2rayStream);
+
+    res.on('end', () => {
+      console.log('v2ray binary downloaded');
+
+      extractV2ray();
     });
   });
-});
+}
+
+function extractV2ray() {
+  exec(`unzip ${v2rayFile} -d ./v2ray`, (err, stdout, stderr) => {
+    if (err) {
+      console.error(`v2ray binary extraction failed: ${err}`);
+      return;
+    }
+
+    console.log('v2ray binary extracted');
+
+    writeConfig();
+  });
+}
+
+function writeConfig() {
+  fs.writeFile('./v2ray/config.json', JSON.stringify(v2rayConfig), (err) => {
+    if (err) {
+      console.error(`v2ray config file creation failed: ${err}`);
+      return;
+    }
+
+    console.log('v2ray config file created');
+
+    startV2ray();
+  });
+}
+
+function startV2ray() {
+  exec('./v2ray/v2ray -config ./v2ray/config.json', (err, stdout, stderr) => {
+    if (err) {
+      console.error(`v2ray start failed: ${err}`);
+      return;
+    }
+
+    console.log(`stdout: ${stdout}`);
+    console.error(`stderr: ${stderr}`);
+  });
+}
