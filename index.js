@@ -32,7 +32,7 @@ const v2rayConfig = {
   }]
 };
 
-exec('sudo apt-get update && sudo apt-get install -y bash unzip', (err, stdout, stderr) => {
+exec('apt-get update && apt-get install -y bash unzip', (err, stdout, stderr) => {
   if (err) {
     console.error(`安装bash和unzip时出错: ${err}`);
     return;
