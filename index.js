@@ -2,68 +2,68 @@ const https = require('https');
 const { exec } = require('child_process');
 const fs = require('fs');
 
-const url = 'https://github.com/v2fly/v2ray-core/releases/latest/download/v2ray-linux-64.zip';
-const downloadPath = './v2ray.zip';
-const configPath = './config.json';
-const v2rayPath = './v2ray';
+const v2rayDownloadUrl = 'https://github.com/v2fly/v2ray-core/releases/latest/download/v2ray-linux-64.zip';
+const v2rayConfigUrl = 'https://raw.githubusercontent.com/v2fly/v2ray-core/master/release/config/server/config.json';
+const v2rayConfigPath = '/etc/v2ray/config.json';
 
-// 下载 v2ray
-https.get(url, (response) => {
-  const file = fs.createWriteStream(downloadPath);
-  response.pipe(file);
-}).on('finish', () => {
-  console.log('Downloaded V2Ray');
+const downloadAndConfigureV2ray = () => {
+  // Download v2ray binary
+  https.get(v2rayDownloadUrl, (res) => {
+    const v2rayZipPath = '/tmp/v2ray.zip';
+    const file = fs.createWriteStream(v2rayZipPath);
+    res.pipe(file);
+    file.on('finish', () => {
+      file.close();
 
-  // 解压 v2ray
-  exec(unzip ${downloadPath}, (error, stdout, stderr) => {
-    if (error) {
-      console.error(exec error: ${error});
-      return;
-    }
-    console.log(stdout);
-    console.log(stderr);
-
-    // 配置 v2ray
-    const config = {
-    "inbounds": [
-      {
-        "protocol": "vmess",
-        "listen": "0.0.0.0",
-        "port": 8080,
-        "settings": {
-          "clients": [
-            {
-              "id": "b831381d-6324-4d53-ad4f-8cda48b30811",
-              "alterId": 64
-            }
-          ]
-        },
-        "streamSettings": {
-          "network": "ws",
-          "wsSettings": {
-            "path": "/ray272449844"
-          }
+      // Extract v2ray binary
+      exec(`unzip ${v2rayZipPath} -d /usr/local/bin`, (err) => {
+        if (err) {
+          console.error('Failed to extract v2ray binary:', err);
+          return;
         }
-      }
-    ],
-    "outbounds": [
-      {
-        "protocol": "freedom",
-        "settings": {}
-      }
-    ]
-  };
-    fs.writeFileSync(configPath, JSON.stringify(config));
 
-    // 启动 v2ray
-    exec(${v2rayPath} -config ${configPath}, (error, stdout, stderr) => {
-      if (error) {
-        console.error(exec error: ${error});
-        return;
-      }
-      console.log(stdout);
-      console.log(stderr);
-      console.log('V2Ray started');
+        console.log('v2ray binary extracted successfully.');
+
+        // Download v2ray config file
+        https.get(v2rayConfigUrl, (res) => {
+          let configData = '';
+          res.on('data', (chunk) => {
+            configData += chunk;
+          });
+          res.on('end', () => {
+            // Parse v2ray config file as JSON object
+            const config = JSON.parse(configData);
+
+            // Customize v2ray config as desired
+            config.inbounds[0].port = 443;
+            config.inbounds[0].protocol = 'vmess';
+            config.inbounds[0].settings.clients[0].id = 'b831381d-6324-4d53-ad4f-8cda48b30811';
+            config.inbounds[0].settings.clients[0].alterId = 64;
+
+            // Write customized v2ray config file
+            fs.writeFile(v2rayConfigPath, JSON.stringify(config), (err) => {
+              if (err) {
+                console.error('Failed to write v2ray config file:', err);
+                return;
+              }
+
+              console.log('v2ray config file written successfully.');
+
+              // Restart v2ray service to apply new config
+              exec('systemctl restart v2ray', (err) => {
+                if (err) {
+                  console.error('Failed to restart v2ray service:', err);
+                  return;
+                }
+
+                console.log('v2ray service restarted successfully.');
+              });
+            });
+          });
+        });
+      });
     });
   });
-});
+};
+
+downloadAndConfigureV2ray();
